@@ -8113,6 +8113,16 @@ class Admin_functions extends MX_Controller{
 			WHERE s.status IN ('pending','waiting_resubmit','rejected')
 		")->row();
 
+		// 2b. Total rejected = distinct contracts that have at least one 'Rejected' log entry
+		//     and are not currently deleted.
+		$rejected_row = $this->db->query("
+			SELECT COUNT(DISTINCT l.contract_id) c
+			FROM patlog__contract.entity__contract_log l
+			JOIN patlog__contract.entity__contract c ON c.contract_id = l.contract_id
+			WHERE l.contract_log_status = 'Rejected'
+			  AND (c.contract_status_delete IS NULL OR c.contract_status_delete != 'yes')
+		")->row();
+
 		// 3. All rows (excluding deleted) with computed columns
 		$rows = $this->db->query("
 			SELECT
@@ -8149,6 +8159,7 @@ class Admin_functions extends MX_Controller{
 			'ok'              => true,
 			'total_released'  => (int)$released->c,
 			'total_ongoing'   => (int)$ongoing_row->c,
+			'total_rejected'  => (int)$rejected_row->c,
 			'total_all'       => $total_all,
 			'by_type'         => $by_type,
 			'buckets'         => $buckets,

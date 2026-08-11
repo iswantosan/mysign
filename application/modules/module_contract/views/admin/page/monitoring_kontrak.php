@@ -4,13 +4,22 @@
 	set_time_limit(0);
 ?>
 <style type="text/css">
-	.mk-stat { padding: 18px; border-radius:4px; color:#fff; margin-bottom:16px; }
+	/* Equal-height stat cards using CSS grid — 5 columns on desktop, wraps on smaller. */
+	.mk-stats-row { display:grid; grid-template-columns: repeat(5, 1fr); gap:12px; margin-bottom:16px; }
+	@media (max-width: 991px) { .mk-stats-row { grid-template-columns: repeat(2, 1fr); } }
+	.mk-stats-row .mk-stat-cell,
+	.mk-stats-row .mk-stat-cell > a { display:flex; width:100%; }
+	.mk-stat {
+		padding: 18px; border-radius:4px; color:#fff;
+		display:flex; flex-direction:column; width:100%;
+	}
 	.mk-stat h1 { margin:6px 0 0; font-size:32px; font-weight:700; }
-	.mk-stat small { display:block; margin-top:6px; opacity:.85; }
+	.mk-stat small { display:block; margin-top:auto; padding-top:6px; opacity:.85; }
 	.mk-stat.st-active   { background:#1ab394; }
 	.mk-stat.st-ongoing  { background:#1c84c6; }
 	.mk-stat.st-warn     { background:#f8ac59; }
 	.mk-stat.st-danger   { background:#ed5565; }
+	.mk-stat.st-reject   { background:#c25050; }
 	.mk-chip {
 		display:inline-block; padding:5px 12px; margin:0 6px 6px 0;
 		border:1px solid #ddd; border-radius:20px; background:#fff;
@@ -44,43 +53,50 @@
 				<div class="ibox-title">
 					<h4>MONITORING KONTRAK</h4>
 					<div class="ibox-tools">
-						<a href="<?php echo site_url('module_request_employee/sirkulir/dashboard'); ?>" class="btn btn-info btn-xs">
-							<i class="fa fa-external-link-alt"></i> Buka Dashboard Sirkulir
+						<a href="<?php echo site_url('module_request_employee/sirkulir/dashboard'); ?>" class="btn btn-primary btn-xs" style="color:#fff;">
+							<i class="fa fa-external-link"></i> Buka Dashboard Sirkulir
 						</a>
 					</div>
 				</div>
 				<div class="ibox-content">
 
 					<!-- ==================== STATS ROW ==================== -->
-					<div class="row">
-						<div class="col-md-3">
+					<div class="mk-stats-row">
+						<div class="mk-stat-cell">
 							<div class="mk-stat st-active">
 								<div><i class="fa fa-file-signature"></i> Total Kontrak Released</div>
 								<h1 id="stat-released">-</h1>
-								<small>Kontrak dgn <code>contract_status_done</code>=yes atau punya <code>contract_no_fix</code></small>
+								<small>Kontrak yang sudah selesai/terbit</small>
 							</div>
 						</div>
-						<div class="col-md-3">
+						<div class="mk-stat-cell">
 							<a href="<?php echo site_url('module_request_employee/sirkulir/dashboard'); ?>" style="text-decoration:none;">
 								<div class="mk-stat st-ongoing">
 									<div><i class="fa fa-hourglass-half"></i> Total Request Ongoing</div>
 									<h1 id="stat-ongoing">-</h1>
-									<small>Request kontrak yang masih berjalan (dashboard sirkulir)</small>
+									<small>Request kontrak yang masih berjalan</small>
 								</div>
 							</a>
 						</div>
-						<div class="col-md-3">
+						<div class="mk-stat-cell">
 							<div class="mk-stat st-warn">
 								<div><i class="fa fa-exclamation-triangle"></i> Berakhir &lt; 2 Bulan</div>
 								<h1 id="stat-under-2m">-</h1>
 								<small>Kontrak aktif yang akan berakhir dalam 60 hari</small>
 							</div>
 						</div>
-						<div class="col-md-3">
+						<div class="mk-stat-cell">
 							<div class="mk-stat st-danger">
-								<div><i class="fa fa-ban"></i> Kadaluarsa (belum ditutup)</div>
+								<div><i class="fa fa-ban"></i> Kadaluarsa</div>
 								<h1 id="stat-expired">-</h1>
-								<small><code>contract_active_end_date</code> &lt; hari ini &amp; belum done</small>
+								<small>Sudah lewat tanggal berakhir</small>
+							</div>
+						</div>
+						<div class="mk-stat-cell">
+							<div class="mk-stat st-reject">
+								<div><i class="fa fa-times-circle"></i> Rejected</div>
+								<h1 id="stat-rejected">-</h1>
+								<small>Kontrak yang pernah di-reject dalam approval</small>
 							</div>
 						</div>
 					</div>
@@ -88,7 +104,7 @@
 					<!-- ==================== BREAKDOWN PER TIPE ==================== -->
 					<div class="row">
 						<div class="col-md-12">
-							<h4>Breakdown per Tipe Kontrak <small class="text-muted">(aktif / tidak aktif — sumber: pola <code>contract_no_fix</code>)</small></h4>
+							<h4>Breakdown per Tipe Kontrak <small class="text-muted">(aktif / tidak aktif)</small></h4>
 						</div>
 						<div class="col-md-3"><div class="mk-breakdown-card"><h4><span class="mk-type-badge mk-type-utama">Kontrak Utama</span></h4><div id="bd-utama">-</div></div></div>
 						<div class="col-md-3"><div class="mk-breakdown-card"><h4><span class="mk-type-badge mk-type-adendum">Adendum</span></h4><div id="bd-adendum">-</div></div></div>
@@ -177,6 +193,7 @@
 		$('#stat-ongoing').text(fmtNum(res.total_ongoing));
 		$('#stat-under-2m').text(fmtNum(res.buckets.under_2m));
 		$('#stat-expired').text(fmtNum(res.buckets.expired));
+		$('#stat-rejected').text(fmtNum(res.total_rejected));
 
 		$('#cnt-all').text(fmtNum(res.total_all));
 		$('#cnt-under_2m').text(fmtNum(res.buckets.under_2m));
@@ -197,8 +214,12 @@
 	}
 
 	function loadList(filter){
+		// Destroy existing DataTable instance before repopulating
+		if ($.fn.DataTable && $.fn.DataTable.isDataTable('#listing-table')) {
+			$('#listing-table').DataTable().destroy();
+		}
 		$('#listing-table tbody').html('<tr><td colspan="12" class="text-center"><i class="fa fa-spinner fa-spin"></i> Memuat...</td></tr>');
-		$.get(API_LIST, { filter: filter, limit: 500 }, function(res){
+		$.get(API_LIST, { filter: filter, limit: 5000 }, function(res){
 			if(!res || !res.ok){
 				$('#listing-table tbody').html('<tr><td colspan="12" class="text-danger">Gagal memuat data.</td></tr>');
 				return;
@@ -221,11 +242,27 @@
 					+ '<td>'+fmtCur(r.currency, r.value)+'</td>'
 					+ '<td>'+(r.date_start||'-')+'</td>'
 					+ '<td>'+(r.date_end||'-')+'</td>'
-					+ '<td>'+daysCell(r.days_remaining)+'</td>'
+					+ '<td data-order="'+(r.days_remaining==null?-99999:r.days_remaining)+'">'+daysCell(r.days_remaining)+'</td>'
 					+ '<td>'+statusBadge(r)+'</td>'
 					+ '</tr>';
 			}
 			$('#listing-table tbody').html(html);
+			if ($.fn.DataTable) {
+				$('#listing-table').DataTable({
+					pageLength: 25,
+					lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'Semua']],
+					order: [[10, 'asc']],
+					language: {
+						search: 'Cari:',
+						lengthMenu: 'Tampilkan _MENU_ baris',
+						info: 'Menampilkan _START_ - _END_ dari _TOTAL_',
+						infoEmpty: '0 baris',
+						infoFiltered: '(dari _MAX_ total)',
+						paginate: { first:'Awal', last:'Akhir', next:'Berikut', previous:'Sebelum' },
+						zeroRecords: 'Tidak ada data yang cocok'
+					}
+				});
+			}
 		}, 'json').fail(function(){
 			$('#listing-table tbody').html('<tr><td colspan="12" class="text-danger">Gagal memuat data (network).</td></tr>');
 		});

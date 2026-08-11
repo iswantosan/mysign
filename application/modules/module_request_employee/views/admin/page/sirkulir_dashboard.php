@@ -92,12 +92,7 @@ $api = site_url('module_request_employee/sirkulir');
 
       <!-- ================= ADMIN TAB (default) ================= -->
       <div id="tab-admin" class="tab-pane active">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-          <h3 style="margin:0">Overview semua request sirkulir <small>(admin view — visible tanpa pilih user)</small></h3>
-          <button type="button" class="btn btn-warning btn-sm" id="btn-reset-demo" title="Balikin 5 request (15–19) ke state seed awal">
-            <i class="fa fa-undo"></i> Reset Demo Data
-          </button>
-        </div>
+        <h3 style="margin:0 0 10px">Overview semua request sirkulir</h3>
         <div id="admin-stats" class="row sirk-stats-row"></div>
         <div class="row sirk-charts-row" style="margin-top:20px">
           <div class="col-md-5"><div class="sirk-chart-card"><h4>Distribusi Status</h4><div class="sirk-canvas-wrap h-260"><canvas id="chart-donut"></canvas></div></div></div>
@@ -634,20 +629,6 @@ $api = site_url('module_request_employee/sirkulir');
     u.searchParams.delete('date_from'); u.searchParams.delete('date_to');
     history.replaceState(null, '', u.toString());
     loadAll();
-  });
-
-  // --- RESET DEMO ----------------------------------------------------------
-  $('#btn-reset-demo').on('click', function() {
-    if (!confirm('Reset 5 request demo (15–19) ke state seed awal?\n\nSemua approve/reject/return yg lo lakuin selama demo bakal ke-overwrite.')) return;
-    var $b = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Resetting…');
-    $.post(url('api_reset_demo'), {}, function(res) {
-      if (!res.ok) { alert('Reset gagal: ' + (res.error || 'unknown')); $b.prop('disabled', false).html('<i class="fa fa-undo"></i> Reset Demo Data'); return; }
-      $b.html('<i class="fa fa-check"></i> Reset OK, reload…');
-      setTimeout(function() { window.location.reload(); }, 400);
-    }, 'json').fail(function(xhr) {
-      alert('Reset error (HTTP ' + xhr.status + '): ' + (xhr.responseText || '').substring(0, 200));
-      $b.prop('disabled', false).html('<i class="fa fa-undo"></i> Reset Demo Data');
-    });
   });
 
   // --- INIT ----------------------------------------------------------------
