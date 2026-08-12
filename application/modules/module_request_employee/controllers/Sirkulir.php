@@ -74,6 +74,10 @@ class Sirkulir extends MX_Controller {
                 r.request_employee_creator_employee_in_name    AS creator_name,
                 r.request_employee_creator_position            AS creator_position,
                 r.request_employee_project_code_name           AS project_name,
+                (SELECT COALESCE(NULLIF(TRIM(c.contract_no_fix),''), c.contract_no)
+                    FROM patlog__contract.entity__contract c
+                    WHERE c.contract_project_code_id = r.request_employee_project_code_id
+                    ORDER BY c.contract_id DESC LIMIT 1)       AS contract_name,
                 COUNT(s.sirkulasi_id)                          AS total,
                 SUM(s.status='approved')                       AS approved,
                 SUM(s.status='pending')                        AS pending,
@@ -107,6 +111,10 @@ class Sirkulir extends MX_Controller {
                 r.request_employee_creator_employee_in_name    AS creator_name,
                 r.request_employee_creator_position            AS creator_position,
                 r.request_employee_project_code_name           AS project_name,
+                (SELECT COALESCE(NULLIF(TRIM(c.contract_no_fix),''), c.contract_no)
+                    FROM patlog__contract.entity__contract c
+                    WHERE c.contract_project_code_id = r.request_employee_project_code_id
+                    ORDER BY c.contract_id DESC LIMIT 1)       AS contract_name,
                 COALESCE((SELECT COUNT(DISTINCT l.request_employee_process_name)
                     FROM patlog__request_employee.entity__request_employee_log l
                     WHERE l.request_employee_id = r.request_employee_id), 0) AS total,
@@ -243,7 +251,7 @@ class Sirkulir extends MX_Controller {
         }
 
         // L2 addition: nama kontrak — best-effort lookup.
-        // If a matching contract in patlog__contract_employee exists for the same
+        // If a matching contract in patlog__contract exists for the same
         // project_code_id, prefer its contract_no_fix / contract_no.
         // Fallback: request description + project name (still descriptive).
         $contract_name = null;
@@ -252,7 +260,7 @@ class Sirkulir extends MX_Controller {
             if (!empty($req->project_code_id)) {
                 $c = $this->db->query("
                     SELECT contract_no, contract_no_fix
-                      FROM patlog__contract_employee.entity__contract
+                      FROM patlog__contract.entity__contract
                      WHERE contract_project_code_id = ?
                      ORDER BY contract_id DESC
                      LIMIT 1", array($req->project_code_id))->row();

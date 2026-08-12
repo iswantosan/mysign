@@ -367,15 +367,19 @@ $api = site_url('module_request_employee/sirkulir');
 
     // -------- Big table of all requests --------
     var t = '<table class="table table-striped table-hover"><thead><tr>'
-          + '<th>Req No</th><th>Flow</th><th>Tanggal</th><th>Requester</th><th>Status</th><th style="min-width:220px">Progress</th><th>Actioned</th><th></th>'
+          + '<th>Req No</th><th>Flow</th><th>Nama Kontrak</th><th>Tanggal</th><th>Requester</th><th>Status</th><th style="min-width:220px">Progress</th><th>Actioned</th><th></th>'
           + '</tr></thead><tbody>';
     items.forEach(function(it) {
       var srcBadge = (it.source === 'legacy')
         ? '<span class="label label-default" title="Serial-workflow lama">Legacy</span>'
         : '<span class="label label-info" title="Parallel-approval baru">Sirkulir</span>';
+      var kontrakCell = it.contract_name
+        ? '<span title="' + String(it.contract_name).replace(/"/g,'&quot;') + '">' + String(it.contract_name).replace(/</g,'&lt;') + '</span>'
+        : (it.project_name ? '<small class="text-muted">' + String(it.project_name).replace(/</g,'&lt;') + '</small>' : '<small class="text-muted">-</small>');
       t += '<tr>'
         + '<td>' + (it.req_no || '#'+it.req_id) + '</td>'
         + '<td>' + srcBadge + '</td>'
+        + '<td>' + kontrakCell + '</td>'
         + '<td>' + (it.req_date || '') + '</td>'
         + '<td>' + it.creator_name + '<br><small class="text-muted">' + it.creator_position + '</small></td>'
         + '<td>' + statusBadge(it.overall_status) + '</td>'
