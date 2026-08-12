@@ -100,13 +100,13 @@ $api = site_url('module_request_employee/sirkulir');
 
       <!-- ================= APPROVER TAB ================= -->
       <div id="tab-approver" class="tab-pane">
-        <h3>Approval yg butuh saya <small>(hanya baris <code>pending</code> yg approver-nya saya)</small></h3>
+        <h3>Approval yg butuh saya</h3>
         <div id="approver-list"><i>Pilih user dulu di atas…</i></div>
       </div>
 
       <!-- ================= REQUESTER TAB ================= -->
       <div id="tab-requester" class="tab-pane">
-        <h3>Request yg saya ajukan <small>(sebagai requester)</small></h3>
+        <h3>Request yg saya ajukan</h3>
         <div id="requester-list"><i>Pilih user dulu di atas…</i></div>
       </div>
 
@@ -494,11 +494,10 @@ $api = site_url('module_request_employee/sirkulir');
       var periodLine = (r.date_start || r.date_end)
         ? '<p><b>Periode Pekerjaan:</b> ' + (r.date_start || '-') + ' s/d ' + (r.date_end || '-') + '</p>'
         : '';
-      var sourceLine = (res.source === 'legacy')
-        ? '<p><span class="label label-default">Legacy flow</span> <small class="text-muted">Alur serial (Pengajuan &rarr; Selesai) &mdash; per-step data disintesis dari <code>entity__request_employee_log</code>. Konsep reject/return tidak ada di flow ini.</small></p>'
+      var sourceBadge = (res.source === 'legacy')
+        ? ' <span class="label label-default pull-right" style="font-size:11px;">Legacy Flow</span>'
         : '';
-      var t = '<h4>' + (r.req_no || '#'+r.req_id) + ' — ' + (r.project_name || '') + '</h4>'
-            + sourceLine
+      var t = '<h4>' + (r.req_no || '#'+r.req_id) + ' — ' + (r.project_name || '') + sourceBadge + '</h4>'
             + kontrakLine
             + periodLine
             + '<p><b>Requester:</b> ' + r.creator_name + ' (' + r.creator_position + ')</p>';
