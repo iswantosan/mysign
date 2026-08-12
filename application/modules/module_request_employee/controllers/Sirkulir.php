@@ -62,7 +62,8 @@ class Sirkulir extends MX_Controller {
             $params[] = $date_to;
         }
 
-        $rows = $this->db->query("
+        // (A) Real sirkulir rows — parallel-approval flow
+        $sirkulir_rows = $this->db->query("
             SELECT
                 r.request_employee_id                          AS req_id,
                 r.request_employee_no                          AS req_no,
@@ -79,14 +80,62 @@ class Sirkulir extends MX_Controller {
                 SUM(s.status='rejected')                       AS rejected,
                 SUM(s.status='waiting_resubmit')               AS waiting_resubmit,
                 MAX(s.actioned_at)                             AS last_action,
-                MIN(s.assigned_at)                             AS submitted_at
+                MIN(s.assigned_at)                             AS submitted_at,
+                'sirkulir'                                     AS source
             FROM patlog__request_employee.entity__request_employee r
             INNER JOIN patlog__request_employee.entity__request_employee_sirkulasi s
                     ON s.request_employee_id = r.request_employee_id
             WHERE 1=1 {$where}
             GROUP BY r.request_employee_id
-            ORDER BY r.request_employee_id DESC
         ", $params)->result();
+
+        // (B) Legacy sequential-workflow rows — synthesised into sirkulir shape.
+        // Only include requests that DON'T have any sirkulasi row (avoid dupes).
+        // Legacy has no reject/return semantics, so those counters stay 0.
+        //   total    = distinct process steps seen in log
+        //   approved = distinct steps other than the current one (i.e. steps already passed)
+        //   pending  = 1 if current step != 'Selesai' AND request has a current step, else 0
+        //   overall_status: derived from request_employee_process_name
+        $legacy_rows = $this->db->query("
+            SELECT
+                r.request_employee_id                          AS req_id,
+                r.request_employee_no                          AS req_no,
+                r.request_employee_date                        AS req_date,
+                r.request_employee_date_start                  AS date_start,
+                r.request_employee_date_end                    AS date_end,
+                r.request_employee_creator_employee_in_id      AS creator_id,
+                r.request_employee_creator_employee_in_name    AS creator_name,
+                r.request_employee_creator_position            AS creator_position,
+                r.request_employee_project_code_name           AS project_name,
+                COALESCE((SELECT COUNT(DISTINCT l.request_employee_process_name)
+                    FROM patlog__request_employee.entity__request_employee_log l
+                    WHERE l.request_employee_id = r.request_employee_id), 0) AS total,
+                COALESCE((SELECT COUNT(DISTINCT l.request_employee_process_name)
+                    FROM patlog__request_employee.entity__request_employee_log l
+                    WHERE l.request_employee_id = r.request_employee_id
+                      AND (r.request_employee_process_name IS NULL
+                        OR l.request_employee_process_name != r.request_employee_process_name)), 0) AS approved,
+                CASE WHEN r.request_employee_process_name IS NULL
+                      OR TRIM(r.request_employee_process_name) = 'Selesai' THEN 0 ELSE 1 END AS pending,
+                0 AS rejected,
+                0 AS waiting_resubmit,
+                (SELECT MAX(l.request_employee_log_insert)
+                    FROM patlog__request_employee.entity__request_employee_log l
+                    WHERE l.request_employee_id = r.request_employee_id) AS last_action,
+                (SELECT MIN(l.request_employee_log_insert)
+                    FROM patlog__request_employee.entity__request_employee_log l
+                    WHERE l.request_employee_id = r.request_employee_id) AS submitted_at,
+                'legacy'                                       AS source
+            FROM patlog__request_employee.entity__request_employee r
+            WHERE 1=1 {$where}
+              AND NOT EXISTS (SELECT 1
+                    FROM patlog__request_employee.entity__request_employee_sirkulasi s
+                    WHERE s.request_employee_id = r.request_employee_id)
+        ", $params)->result();
+
+        // Merge, sort by req_id desc so both flows interleave chronologically
+        $rows = array_merge($sirkulir_rows, $legacy_rows);
+        usort($rows, function($a, $b) { return ((int)$b->req_id) - ((int)$a->req_id); });
 
         foreach ($rows as $r) {
             $r->overall_status = $this->derive_overall_status($r);
@@ -98,6 +147,10 @@ class Sirkulir extends MX_Controller {
             'items'      => $rows,
             'date_from'  => $date_from,
             'date_to'    => $date_to,
+            'counts'     => array(
+                'sirkulir' => count($sirkulir_rows),
+                'legacy'   => count($legacy_rows),
+            ),
         )));
     }
 
@@ -141,6 +194,54 @@ class Sirkulir extends MX_Controller {
              WHERE request_employee_id = ?
              ORDER BY created_at, log_id", array($request_id))->result();
 
+        // If no sirkulir rows exist, this is a legacy request — synthesise
+        // sirkulasi + log arrays from entity__request_employee_log so the same
+        // detail modal can render both flows.
+        $source = 'sirkulir';
+        if (empty($sirkulasi)) {
+            $source = 'legacy';
+            $legacy_steps = $this->db->query("
+                SELECT request_employee_log_id, request_employee_process_id, request_employee_process_order,
+                       request_employee_process_name, request_employee_log_approver_level,
+                       request_employee_log_employee_code, request_employee_log_employee_name,
+                       request_employee_log_status, request_employee_log_message, request_employee_log_insert
+                  FROM patlog__request_employee.entity__request_employee_log
+                 WHERE request_employee_id = ?
+                 ORDER BY request_employee_log_id", array($request_id))->result();
+            $prev_ts = null;
+            foreach ($legacy_steps as $i => $s) {
+                $sirkulasi[] = (object) array(
+                    'sirkulasi_id'             => (int)$s->request_employee_log_id,
+                    'process_order'            => $s->request_employee_process_order ?: ($i + 1),
+                    'process_name'             => $s->request_employee_process_name,
+                    'approver_employee_in_id'  => null,
+                    'approver_code'            => $s->request_employee_log_employee_code,
+                    'approver_name'            => $s->request_employee_log_employee_name,
+                    'approver_position'        => null,
+                    'status'                   => 'approved',
+                    'returned_to_sirkulasi_id' => null,
+                    'return_target_type'       => null,
+                    'revision_no'              => 0,
+                    'assigned_at'              => $prev_ts,
+                    'actioned_at'              => $s->request_employee_log_insert,
+                    'note'                     => $s->request_employee_log_message,
+                    'duration_seconds'         => $prev_ts ? (strtotime($s->request_employee_log_insert) - strtotime($prev_ts)) : 0,
+                );
+                $prev_ts = $s->request_employee_log_insert;
+                $log[] = (object) array(
+                    'log_id'              => (int)$s->request_employee_log_id,
+                    'sirkulasi_id'        => (int)$s->request_employee_log_id,
+                    'actor_employee_in_id'=> null,
+                    'actor_name'          => $s->request_employee_log_employee_name,
+                    'action'              => ($i === 0) ? 'submit' : 'approve',
+                    'target_sirkulasi_id' => null,
+                    'note'                => $s->request_employee_log_status
+                                           . ($s->request_employee_log_message ? (' — '.$s->request_employee_log_message) : ''),
+                    'created_at'          => $s->request_employee_log_insert,
+                );
+            }
+        }
+
         // L2 addition: nama kontrak — best-effort lookup.
         // If a matching contract in patlog__contract_employee exists for the same
         // project_code_id, prefer its contract_no_fix / contract_no.
@@ -177,6 +278,7 @@ class Sirkulir extends MX_Controller {
             'log'           => $log,
             'contract_name' => $contract_name,
             'contract_no'   => $contract_no,
+            'source'        => $source,
         )));
     }
 
@@ -544,9 +646,15 @@ class Sirkulir extends MX_Controller {
     }
 
     private function derive_overall_status($row) {
+        // Legacy rows (no sirkulir semantics): decide from pending flag only.
+        if (isset($row->source) && $row->source === 'legacy') {
+            if ((int)$row->pending === 0 && (int)$row->total > 0) return 'APPROVED';
+            if ((int)$row->approved > 0)                          return 'IN_PROGRESS';
+            return 'PENDING';
+        }
         if ((int)$row->waiting_resubmit > 0) return 'RETURNED';
         if ((int)$row->rejected > 0)         return 'REJECTED';
-        if ((int)$row->approved === (int)$row->total) return 'APPROVED';
+        if ((int)$row->total > 0 && (int)$row->approved === (int)$row->total) return 'APPROVED';
         if ((int)$row->approved > 0)         return 'IN_PROGRESS';
         return 'PENDING';
     }

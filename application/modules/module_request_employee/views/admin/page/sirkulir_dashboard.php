@@ -367,11 +367,15 @@ $api = site_url('module_request_employee/sirkulir');
 
     // -------- Big table of all requests --------
     var t = '<table class="table table-striped table-hover"><thead><tr>'
-          + '<th>Req No</th><th>Tanggal</th><th>Requester</th><th>Status</th><th style="min-width:220px">Progress</th><th>Actioned</th><th></th>'
+          + '<th>Req No</th><th>Flow</th><th>Tanggal</th><th>Requester</th><th>Status</th><th style="min-width:220px">Progress</th><th>Actioned</th><th></th>'
           + '</tr></thead><tbody>';
     items.forEach(function(it) {
+      var srcBadge = (it.source === 'legacy')
+        ? '<span class="label label-default" title="Serial-workflow lama">Legacy</span>'
+        : '<span class="label label-info" title="Parallel-approval baru">Sirkulir</span>';
       t += '<tr>'
         + '<td>' + (it.req_no || '#'+it.req_id) + '</td>'
+        + '<td>' + srcBadge + '</td>'
         + '<td>' + (it.req_date || '') + '</td>'
         + '<td>' + it.creator_name + '<br><small class="text-muted">' + it.creator_position + '</small></td>'
         + '<td>' + statusBadge(it.overall_status) + '</td>'
@@ -486,12 +490,16 @@ $api = site_url('module_request_employee/sirkulir');
       var periodLine = (r.date_start || r.date_end)
         ? '<p><b>Periode Pekerjaan:</b> ' + (r.date_start || '-') + ' s/d ' + (r.date_end || '-') + '</p>'
         : '';
+      var sourceLine = (res.source === 'legacy')
+        ? '<p><span class="label label-default">Legacy flow</span> <small class="text-muted">Alur serial (Pengajuan &rarr; Selesai) &mdash; per-step data disintesis dari <code>entity__request_employee_log</code>. Konsep reject/return tidak ada di flow ini.</small></p>'
+        : '';
       var t = '<h4>' + (r.req_no || '#'+r.req_id) + ' — ' + (r.project_name || '') + '</h4>'
+            + sourceLine
             + kontrakLine
             + periodLine
             + '<p><b>Requester:</b> ' + r.creator_name + ' (' + r.creator_position + ')</p>';
 
-      t += '<h5>Sirkulasi rows (' + res.sirkulasi.length + ')</h5>';
+      t += '<h5>' + (res.source === 'legacy' ? 'Riwayat Proses' : 'Sirkulasi rows') + ' (' + res.sirkulasi.length + ')</h5>';
       t += '<table class="table table-condensed table-bordered"><thead><tr>'
          + '<th>Order</th><th>Step</th><th>Approver</th><th>Status</th><th>Rev</th><th>Durasi</th><th>Note</th><th>Actioned</th>'
          + '</tr></thead><tbody>';
