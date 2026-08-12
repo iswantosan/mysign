@@ -21,8 +21,6 @@
  *   api_approve/{sirkulasi_id}        — POST: approve
  *   api_reject/{sirkulasi_id}         — POST: reject + return (needs target_type, target_id)
  *   api_resubmit/{sirkulasi_id}       — POST: return target resubmits after revision
- *
- * Demo auth: `?as_employee=<employee_in_id>` overrides session for testing.
  */
 class Sirkulir extends MX_Controller {
 
@@ -40,7 +38,6 @@ class Sirkulir extends MX_Controller {
         $this->load->view('admin/header');
         $this->load->view('admin/page/sirkulir_dashboard', array(
             'current_employee_id' => $this->current_employee_id(),
-            'demo_users'          => $this->list_demo_users(),
         ));
         $this->load->view('admin/footer');
     }
@@ -542,21 +539,8 @@ class Sirkulir extends MX_Controller {
     }
 
     private function current_employee_id() {
-        $qp = $this->input->get('as_employee');
-        if ($qp) return (int)$qp;
         $sess = $this->session->userdata('employee_in_id');
         return $sess ? (int)base64_decode($sess) : null;
-    }
-
-    /** For the demo dashboard's "act as" dropdown. */
-    private function list_demo_users() {
-        // Real users involved in the seeded requests + approvers pool.
-        return $this->db->query("
-            SELECT employee_in_id AS id, employee_in_code AS code, employee_in_name AS name, employee_in_position AS position
-              FROM patlog__hrms.entity__employee_in
-             WHERE employee_in_id IN (3, 77, 98, 244, 293, 250, 465, 749)
-             ORDER BY FIELD(employee_in_position,'Direktur','Vice President','Manajer','Supervisor','Staf'), employee_in_name")
-            ->result();
     }
 
     private function derive_overall_status($row) {

@@ -1,5 +1,5 @@
 <?php
-// $current_employee_id, $demo_users passed from Sirkulir::dashboard
+// $current_employee_id passed from Sirkulir::dashboard
 $api = site_url('module_request_employee/sirkulir');
 ?>
 <style>
@@ -7,8 +7,6 @@ $api = site_url('module_request_employee/sirkulir');
   #sirk-root h2 { margin:0 0 4px; color:#333; }
   #sirk-root .sirk-toolbar { background:#fff; border:1px solid #e7eaec; padding:16px 20px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
   #sirk-root .sirk-toolbar label { margin:0 8px 0 0; font-weight:600; color:#555; }
-  #sirk-root select#as_employee { display:inline-block; width:320px; height:34px; padding:6px 10px; border:1px solid #ccc; background:#fff; color:#333; font-size:14px; }
-  #sirk-root select#as_employee option { color:#333; background:#fff; }
   #sirk-root .sirk-body { background:#fff; border:1px solid #e7eaec; padding:20px; }
   #sirk-root .nav-tabs > li > a { color:#555; }
   #sirk-root .nav-tabs > li.active > a { color:#1ab394; font-weight:600; }
@@ -66,17 +64,6 @@ $api = site_url('module_request_employee/sirkulir');
         <input type="date" id="filter_date_to" style="height:34px;padding:4px 8px;border:1px solid #ccc;" />
         <button type="button" id="btn_apply_filter" class="btn btn-sm btn-primary" style="height:34px;">Terapkan</button>
         <button type="button" id="btn_clear_filter" class="btn btn-sm btn-default" style="height:34px;">Reset</button>
-      </div>
-      <div>
-        <label style="margin:0 4px 0 0;">Demo — act as:</label>
-        <select id="as_employee">
-          <option value="">-- pilih user --</option>
-          <?php foreach ($demo_users as $u): ?>
-            <option value="<?php echo (int)$u->id; ?>" <?php echo ($current_employee_id == $u->id) ? 'selected' : ''; ?>>
-              <?php echo htmlspecialchars($u->name.' — '.$u->position); ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
       </div>
     </div>
   </div>
@@ -179,7 +166,6 @@ $api = site_url('module_request_employee/sirkulir');
 
   function asParam(extra) {
     var qs = [];
-    if (CURRENT)         qs.push('as_employee=' + CURRENT);
     if (extra !== false) {
       if (DATE_FROM)     qs.push('date_from=' + encodeURIComponent(DATE_FROM));
       if (DATE_TO)       qs.push('date_to='   + encodeURIComponent(DATE_TO));
@@ -595,14 +581,6 @@ $api = site_url('module_request_employee/sirkulir');
       loadAll();
     }, 'json');
   };
-
-  // --- USER SWITCHER -------------------------------------------------------
-  $('#as_employee').on('change', function() {
-    var v = $(this).val();
-    var u = new URL(window.location.href);
-    if (v) u.searchParams.set('as_employee', v); else u.searchParams.delete('as_employee');
-    window.location.href = u.toString();
-  });
 
   // --- DATE RANGE FILTER (L2) ---------------------------------------------
   // Persist across reloads via URL params so the filter survives user-switch too.
