@@ -8314,5 +8314,118 @@ class Admin_functions extends MX_Controller{
 		exit;
 	}
 
+	// ============================================================
+	// Monitoring Kontrak — whitelist admin CRUD
+	// ============================================================
+
+	// Helper: current admin identity for audit trail (fall back to 'Admin').
+	private function _mka_current_admin_audit()
+	{
+		$id = null; $name = 'Admin';
+		if (isset($_SESSION) && is_array($_SESSION)) {
+			foreach ($_SESSION as $k => $v) {
+				if (is_string($k) && substr($k, -3) === '_id' && !is_array($v) && $v !== '') {
+					$maybe = base64_decode($v, true);
+					if ($maybe !== false && is_numeric($maybe)) {
+						$row = $this->db->query("SELECT user_admin_id, user_admin_name FROM patlog__config.entity__user_admin WHERE user_admin_id = ?", array($maybe))->row();
+						if ($row) { $id = (int)$row->user_admin_id; $name = $row->user_admin_name; break; }
+					}
+				}
+			}
+		}
+		return array('id' => $id, 'name' => $name);
+	}
+
+	public function mka_list()
+	{
+		$rows = $this->db->query("
+			SELECT mka_id, employee_in_id, employee_in_code, employee_in_name,
+			       employee_in_position, employee_in_division,
+			       granted_by_id, granted_by_name, mka_note, mka_insert
+			  FROM patlog__contract.entity__monitoring_kontrak_access
+			 ORDER BY mka_insert DESC, mka_id DESC
+		")->result();
+		$this->output->set_content_type('application/json');
+		$this->output->set_output(json_encode(array('ok' => true, 'items' => $rows)));
+	}
+
+	public function mka_search_employee()
+	{
+		$q = trim((string)$this->input->get('q'));
+		if (strlen($q) < 2) {
+			$this->output->set_content_type('application/json');
+			$this->output->set_output(json_encode(array('ok' => true, 'items' => array())));
+			return;
+		}
+		$like = '%'.$q.'%';
+		$rows = $this->db->query("
+			SELECT e.employee_in_id, e.employee_in_code, e.employee_in_name,
+			       d.division_name, f.functions_name AS position_name
+			  FROM patlog__hrms.entity__employee_in e
+			  LEFT JOIN patlog__hrms.entity__division  d ON d.division_id  = e.division_id
+			  LEFT JOIN patlog__hrms.entity__functions f ON f.functions_id = e.functions_id
+			 WHERE e.employee_in_status = 'active'
+			   AND (e.employee_in_name LIKE ? OR e.employee_in_code LIKE ?)
+			 ORDER BY e.employee_in_name
+			 LIMIT 25
+		", array($like, $like))->result();
+		$this->output->set_content_type('application/json');
+		$this->output->set_output(json_encode(array('ok' => true, 'items' => $rows)));
+	}
+
+	public function mka_grant()
+	{
+		$employee_in_id = (int)$this->input->post('employee_in_id');
+		$note = trim((string)$this->input->post('mka_note'));
+		if ($employee_in_id <= 0) {
+			$this->output->set_content_type('application/json');
+			$this->output->set_output(json_encode(array('ok' => false, 'error' => 'employee_in_id wajib')));
+			return;
+		}
+		// Guard: prevent duplicate
+		$exist = $this->db->query("SELECT mka_id FROM patlog__contract.entity__monitoring_kontrak_access WHERE employee_in_id = ?", array($employee_in_id))->row();
+		if ($exist) {
+			$this->output->set_content_type('application/json');
+			$this->output->set_output(json_encode(array('ok' => false, 'error' => 'User sudah punya akses')));
+			return;
+		}
+		$emp = $this->db->query("
+			SELECT e.employee_in_id, e.employee_in_code, e.employee_in_name,
+			       d.division_name, f.functions_name AS position_name
+			  FROM patlog__hrms.entity__employee_in e
+			  LEFT JOIN patlog__hrms.entity__division  d ON d.division_id  = e.division_id
+			  LEFT JOIN patlog__hrms.entity__functions f ON f.functions_id = e.functions_id
+			 WHERE e.employee_in_id = ? LIMIT 1", array($employee_in_id))->row();
+		if (!$emp) {
+			$this->output->set_content_type('application/json');
+			$this->output->set_output(json_encode(array('ok' => false, 'error' => 'Employee tidak ditemukan')));
+			return;
+		}
+		$actor = $this->_mka_current_admin_audit();
+		$this->db->query("
+			INSERT INTO patlog__contract.entity__monitoring_kontrak_access
+				(employee_in_id, employee_in_code, employee_in_name, employee_in_position, employee_in_division,
+				 granted_by_id, granted_by_name, mka_note, mka_insert)
+			VALUES (?,?,?,?,?, ?,?, ?, NOW())
+		", array($emp->employee_in_id, $emp->employee_in_code, $emp->employee_in_name,
+		         $emp->position_name, $emp->division_name,
+		         $actor['id'], $actor['name'], $note ?: null));
+		$this->output->set_content_type('application/json');
+		$this->output->set_output(json_encode(array('ok' => true)));
+	}
+
+	public function mka_revoke()
+	{
+		$mka_id = (int)$this->input->post('mka_id');
+		if ($mka_id <= 0) {
+			$this->output->set_content_type('application/json');
+			$this->output->set_output(json_encode(array('ok' => false, 'error' => 'mka_id wajib')));
+			return;
+		}
+		$this->db->query("DELETE FROM patlog__contract.entity__monitoring_kontrak_access WHERE mka_id = ?", array($mka_id));
+		$this->output->set_content_type('application/json');
+		$this->output->set_output(json_encode(array('ok' => true)));
+	}
+
 }
 ?>

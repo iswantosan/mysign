@@ -70,112 +70,162 @@
 							<div class="dropdown profile-element">
 								<img alt="image" class="img-circle" src="<?php echo base_url('assets/mod__contract/public/user.png'); ?>" height="42">
 								<a data-toggle="dropdown" class="dropdown-toggle" href="#">
-									<?php
-										if(!$this->session->userdata('role')){
-									?>
 									<span class="clear">
 										<span class="block m-t-xs">
-											<strong class="font-bold">Admin</strong>
+											<?php
+												unset($datato);
+												$datato['table'] = 'patlog__hrms.entity__employee_in';
+												$datato['where'] = array(
+													'patlog__hrms.entity__employee_in.employee_in_id' => base64_decode($this->session->userdata('employee_id'))
+												);
+												$Q1 = $this->view->view_data($datato);
+												if($Q1->num_rows()){
+													$R1 = $Q1->row();
+													$division = $R1->division_id;
+													$functions_id = $R1->functions_id;
+											?>
+											<strong class="font-bold"><?php echo $R1->employee_in_name; ?></strong>
+											<?php
+												}
+											?>
 										</span>
 										<span class="text-xs block">
-											Administrator
+											Pekerja
 										</span>
 									</span>
-									<?php
-										}else{
-									?>
-									<span class="clear">
-										<span class="block m-t-xs">
-											<strong class="font-bold">Viewer</strong>
-										</span>
-										<span class="text-xs block">
-											Viewer
-										</span>
-									</span>
-									<?php
-										}
-									?>
 								</a>
 							</div>
 							<div class="logo-element">
 								ERP
 							</div>
 						</li>
+						<?php
+							unset($datato);
+							$datato['table'] = 'patlog__hrms.entity__employee_in';	
+							$datato['where'] = array(
+								'patlog__hrms.entity__employee_in.employee_in_id' => base64_decode($this->session->userdata('employee_id'))
+							);
+							$Q1 = $this->view->view_data($datato);
+							if($Q1->num_rows()){
+								$R1 = $Q1->row();
+								$employee_in_id = $R1->employee_in_id;
+								$division_id = $R1->division_id;
+								$functions_id = $R1->functions_id;
+							}else{
+								$employee_in_id = null;
+								$division_id = null;
+								$functions_id = null;
+							}
+						
+							unset($datato);
+							$datato['table'] = 'patlog__contract.entity__cog';
+							$Q1 = $this->view->view_data($datato);
+							if($Q1->num_rows()){
+								$R1 = $Q1->row();
+								$cog_division_id = $R1->cog_division_id;
+								$cog_functions_id = $R1->cog_functions_id;
+							}else{
+								$cog_division_id = null;
+								$cog_functions_id = null;
+							}
+						?>
 						<li class="special_link">
-							<a href="<?php echo site_url('module_contract/admin_functions/logout/'); ?>">
+							<a href="<?php echo site_url('module_contract/employee_functions/logout/'); ?>">
 								<i class="fa fa-th"></i> <span class="nav-label">Metro Menu</span>
 							</a>
 						</li>
                         <li class="<?php if(strpos($this->uri->segment(3), 'beranda') !== false){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/beranda/'); ?>">
+                            <a href="<?php echo site_url('module_contract/employee/beranda/'); ?>">
                                 <i class="fa fa-home"></i> <span class="nav-label">Beranda</span>
                             </a>
                         </li>
 						<li class="<?php if(strpos($this->uri->segment(3), 'dashboard') !== false){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/dashboard/'); ?>">
+                            <a href="<?php echo site_url('module_contract/employee/dashboard/'); ?>">
                                 <i class="fa fa-desktop"></i> <span class="nav-label">Dashboard</span>
                             </a>
                         </li>
-						<?php
-							if(!$this->session->userdata('role')){
-						?>
 						<li class="<?php if(strpos($this->uri->segment(3), 'formulir') !== false){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/formulir/'); ?>">
+                            <a href="<?php echo site_url('module_contract/employee/formulir/'); ?>">
                                 <i class="fab fa-wpforms"></i> <span class="nav-label">Formulir Kontrak</span>
                             </a>
                         </li>
 						<?php
+							$count_process = '';
 							unset($datato);
 							$datato['table'] = 'patlog__contract.entity__contract';
-							$datato['where'] = array(
-								'patlog__contract.entity__contract.contract_status_delete' => 'no',
-								'patlog__contract.entity__contract.contract_status_done' => 'no'
-							);
+							$where = '
+								patlog__contract.entity__contract.contract_status_delete = "no" AND 
+								patlog__contract.entity__contract.contract_status_done = "no" AND 
+								(patlog__contract.entity__contract.contract_creator_employee_in_id = '.$employee_in_id.' OR 
+								patlog__contract.entity__contract.contract_approval_current_id = '.$employee_in_id.')
+							';
+							$datato['where'] = $where;
 							$Q1 = $this->view->view_data($datato);
-							if($Q1->num_rows() > 0){
+							if($Q1->num_rows()){
 								$count_process = '<span class="label label-info pull-right">'.$Q1->num_rows().'</span>';
-							}else{
-								$count_process = '';
+							}
+							
+							if($functions_id == $cog_functions_id){
+								unset($datato);
+								$datato['table'] = 'patlog__contract.entity__contract';
+								$datato['where'] = array(
+									'patlog__contract.entity__contract.contract_status_delete' => 'no',
+									'patlog__contract.entity__contract.contract_status_done' => 'no',
+									'patlog__contract.entity__contract.contract_approval_current_category' => 'Loket'
+								);
+								$Q1 = $this->view->view_data($datato);
+								if($Q1->num_rows()){
+									$count_process = '<span class="label label-info pull-right">'.$Q1->num_rows().'</span>';
+								}
 							}
 						?>
 						<li class="<?php if(strpos($this->uri->segment(3), 'proses_kontrak_utama') !== false){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/proses_kontrak_utama/'); ?>">
+                            <a href="<?php echo site_url('module_contract/employee/proses_kontrak_utama/'); ?>">
                                 <i class="fas fa-exchange-alt"></i> <span class="nav-label">Proses</span> <?php echo $count_process; ?>
                             </a>
                         </li>
-						<?php
-							}
-						?>
 						<li class="<?php if($this->uri->segment(3) === 'monitoring'){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/monitoring/'); ?>">
+                            <a href="<?php echo site_url('module_contract/employee/monitoring/'); ?>">
                                 <i class="fas fa-ellipsis-h"></i> <span class="nav-label">Monitoring</span>
                             </a>
                         </li>
+						<?php
+							// "Monitoring Kontrak" menu — only visible if this user is whitelisted.
+							$__mka_employee_id_b64 = $this->session->userdata('employee_id');
+							$__mka_employee_in_id  = $__mka_employee_id_b64 ? (int) base64_decode($__mka_employee_id_b64) : 0;
+							$__mka_show = false;
+							if ($__mka_employee_in_id > 0) {
+								unset($datato);
+								$datato['table'] = 'patlog__contract.entity__monitoring_kontrak_access';
+								$datato['where'] = array(
+									'patlog__contract.entity__monitoring_kontrak_access.employee_in_id' => $__mka_employee_in_id
+								);
+								$__mka_q = $this->view->view_data($datato);
+								$__mka_show = ($__mka_q && $__mka_q->num_rows() > 0);
+							}
+							if ($__mka_show):
+						?>
 						<li class="<?php if($this->uri->segment(3) === 'monitoring_kontrak'){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/monitoring_kontrak/'); ?>">
+                            <a href="<?php echo site_url('module_contract/employee/monitoring_kontrak/'); ?>">
                                 <i class="fas fa-chart-line"></i> <span class="nav-label">Monitoring Kontrak</span>
                             </a>
                         </li>
-						<li class="<?php if($this->uri->segment(3) === 'data_akses_monitoring_kontrak'){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/data_akses_monitoring_kontrak/'); ?>">
-                                <i class="fas fa-user-shield"></i> <span class="nav-label">Akses Monitoring Kontrak</span>
-                            </a>
-                        </li>
+						<?php endif; ?>
 						<li class="<?php if(strpos($this->uri->segment(3), 'arsip_kontrak_utama') !== false){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/arsip_kontrak_utama/'); ?>">
+                            <a href="<?php echo site_url('module_contract/employee/arsip_kontrak_utama/'); ?>">
                                 <i class="fas fa-archive"></i> <span class="nav-label">Arsip</span>
                             </a>
                         </li>
 						<li class="<?php if(strpos($this->uri->segment(3), 'laporan') !== false){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/laporan/'); ?>">
+                            <a href="<?php echo site_url('module_contract/employee/laporan/'); ?>">
                                 <i class="fas fa-clipboard-list"></i> <span class="nav-label">Laporan</span>
                             </a>
                         </li>
 						<?php
-							if(!$this->session->userdata('role')){
+							if($cog_division_id == $division_id){
 						?>
 						<li class="<?php if(strpos($this->uri->segment(3), 'impor') !== false){ echo 'active'; } ?>">
-                            <a href="<?php echo site_url('module_contract/admin/impor/'); ?>">
+                            <a href="<?php echo site_url('module_contract/employee/impor/'); ?>">
                                 <i class="fas fa-file-import"></i> <span class="nav-label">Impor</span>
                             </a>
                         </li>
@@ -184,27 +234,13 @@
 								<i class="fas fa-database"></i> <span class="nav-label">Master Data</span> <span class="fa arrow"></span>
                              </a>
                              <ul class="nav nav-second-level">
-								<li class="<?php if(strpos($this->uri->segment(3), 'data_proses') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/data_proses/'); ?>">Data Proses</a></li>
-                                <li class="<?php if(strpos($this->uri->segment(3), 'data_permintaan') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/data_permintaan/'); ?>">Data Permintaan</a></li>
-                                <li class="<?php if(strpos($this->uri->segment(3), 'data_detail_permintaan') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/data_detail_permintaan/'); ?>">Data Detail Permintaan</a></li>
-                                <li class="<?php if(strpos($this->uri->segment(3), 'data_pihak_ketiga') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/data_pihak_ketiga/'); ?>">Data Pihak Ketiga</a></li>
-                                <li class="<?php if(strpos($this->uri->segment(3), 'data_dokumen') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/data_dokumen/'); ?>">Data Dokumen</a></li>
-                                <li class="<?php if(strpos($this->uri->segment(3), 'data_template') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/data_template/'); ?>">Data Template</a></li>
-                                <li class="<?php if(strpos($this->uri->segment(3), 'data_user_reviewer') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/data_user_reviewer/'); ?>">Data User Reviewer</a></li>
-                                <li class="<?php if(strpos($this->uri->segment(3), 'data_pengingat') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/data_pengingat/'); ?>">Data Pengingat</a></li>
-                                <li class="<?php if(strpos($this->uri->segment(3), 'data_konfigurasi') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/data_konfigurasi/'); ?>">Data Konfigurasi</a></li>
-                            </ul>
-                        </li>
-						<li class="<?php if(strpos($this->uri->segment(3), 'fungsi_') !== false){ echo 'active'; } ?>">
-                             <a href="#">
-								<i class="fas fa-code"></i> <span class="nav-label">Fungsi</span> <span class="fa arrow"></span>
-                             </a>
-                             <ul class="nav nav-second-level">
-								<li class="<?php if(strpos($this->uri->segment(3), 'fungsi_dokumen_temporary') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/fungsi_dokumen_temporary/'); ?>">Fungsi Dokumen Temporary</a></li>
-								<li class="<?php if(strpos($this->uri->segment(3), 'fungsi_inject') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/fungsi_inject/'); ?>">Fungsi Inject</a></li>
-								<li class="<?php if(strpos($this->uri->segment(3), 'fungsi_ke_loket') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/fungsi_ke_loket/'); ?>">Fungsi Ke Loket</a></li>
-								<li class="<?php if(strpos($this->uri->segment(3), 'fungsi_rollback') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/fungsi_rollback/'); ?>">Fungsi Rollback</a></li>
-								<li class="<?php if(strpos($this->uri->segment(3), 'fungsi_arsip') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/admin/fungsi_arsip/'); ?>">Fungsi Arsipkan</a></li>
+								<li class="<?php if(strpos($this->uri->segment(3), 'data_proses') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/employee/data_proses/'); ?>">Data Proses</a></li>
+                                <li class="<?php if(strpos($this->uri->segment(3), 'data_permintaan') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/employee/data_permintaan/'); ?>">Data Permintaan</a></li>
+                                <li class="<?php if(strpos($this->uri->segment(3), 'data_detail_permintaan') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/employee/data_detail_permintaan/'); ?>">Data Detail Permintaan</a></li>
+                                <li class="<?php if(strpos($this->uri->segment(3), 'data_pihak_ketiga') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/employee/data_pihak_ketiga/'); ?>">Data Pihak Ketiga</a></li>
+                                <li class="<?php if(strpos($this->uri->segment(3), 'data_dokumen') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/employee/data_dokumen/'); ?>">Data Dokumen</a></li>
+                                <li class="<?php if(strpos($this->uri->segment(3), 'data_template') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/employee/data_template/'); ?>">Data Template</a></li>
+                                <li class="<?php if(strpos($this->uri->segment(3), 'data_user_reviewer') !== false){ echo 'active'; } ?>"><a href="<?php echo site_url('module_contract/employee/data_user_reviewer/'); ?>">Data User Reviewer</a></li>
                             </ul>
                         </li>
 						<?php
