@@ -37,7 +37,7 @@
 		<div class="col-md-12">
 			<div class="ibox float-e-margins">
 				<div class="ibox-title">
-					<h4>SIRKULIR KONTRAK <small class="text-muted">— proses approval kontrak (source: <code>entity__contract_approval</code> + <code>entity__contract_log</code>)</small></h4>
+					<h4>SIRKULIR KONTRAK</h4>
 					<div class="ibox-tools">
 						<a href="<?php echo site_url('module_contract/admin/monitoring_kontrak/'); ?>" class="btn btn-default btn-xs">
 							<i class="fa fa-arrow-left"></i> Monitoring Kontrak
