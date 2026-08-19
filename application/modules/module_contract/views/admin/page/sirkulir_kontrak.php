@@ -4,8 +4,9 @@
 	set_time_limit(0);
 ?>
 <style type="text/css">
-	.sk-stats-row { display:grid; grid-template-columns: repeat(5, 1fr); gap:12px; margin-bottom:16px; }
+	.sk-stats-row { display:grid; grid-template-columns: repeat(5, 1fr); gap:12px; margin-bottom:16px; align-items:stretch; }
 	@media (max-width: 991px) { .sk-stats-row { grid-template-columns: repeat(2, 1fr); } }
+	.sk-stats-row > div { display:flex; }
 	.sk-stat { padding:18px; border-radius:4px; color:#fff; display:flex; flex-direction:column; width:100%; }
 	.sk-stat h1 { margin:6px 0 0; font-size:32px; font-weight:700; }
 	.sk-stat small { display:block; margin-top:auto; padding-top:6px; opacity:.85; }
@@ -82,7 +83,7 @@
 
 					<!-- List kontrak in-progress -->
 					<div class="sk-card">
-						<h4>Kontrak Sedang Berjalan <small class="text-muted">(belum Done / Delete). Klik <i class="fa fa-eye"></i> untuk timeline approval.</small></h4>
+						<h4>Kontrak Sedang Berjalan</h4>
 						<div class="table-responsive">
 							<table id="sk-list-table" class="table table-striped table-bordered table-hover">
 								<thead>
