@@ -7323,12 +7323,27 @@ class Admin_functions extends MX_Controller{
 			}
 			
 			$path = FCPATH.'assets/mod__contract/attach/document-contract-summary-ttd/document-contract-summary-ttd-'.md5($R1->contract_id).'.pdf';
-			file_put_contents($path, file_get_contents($contract_ttd_sign_download));
-			
+			// Only download+save when Privy actually gave us a URL. Otherwise
+			// file_get_contents(null) returns false and file_put_contents writes
+			// 0 bytes, corrupting any existing signed PDF (root cause of the
+			// "We can't open this file" bug — contract 4643 case, 2026-08-19).
+			$downloaded_ok = false;
+			if (!empty($contract_ttd_sign_download)) {
+				$blob = @file_get_contents($contract_ttd_sign_download);
+				if ($blob !== false && strlen($blob) > 0 && substr($blob, 0, 4) === '%PDF') {
+					file_put_contents($path, $blob);
+					$downloaded_ok = true;
+				}
+			}
+
 			unset($datato);
 			$datato['database'] = 'patlog__contract';
 			$datato['table'] = 'entity__contract';
-			$datato['contract_summary_file_ttd'] = 'document-contract-summary-ttd-'.md5($R1->contract_id).'.pdf';
+			// Only advance summary_file_ttd pointer if the download really landed
+			// as a valid PDF. Prevents pointing to a 0-byte placeholder.
+			if ($downloaded_ok) {
+				$datato['contract_summary_file_ttd'] = 'document-contract-summary-ttd-'.md5($R1->contract_id).'.pdf';
+			}
 			$datato['contract_ttd_sign_download'] = $contract_ttd_sign_download;
 			$datato['contract_ttd_sign_date_sign'] = $contract_ttd_sign_date_sign;
 			$datato['contract_ttd_sign_date_expired'] = $contract_ttd_sign_date_expired;
