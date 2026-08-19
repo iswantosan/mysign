@@ -8427,5 +8427,191 @@ class Admin_functions extends MX_Controller{
 		$this->output->set_output(json_encode(array('ok' => true)));
 	}
 
+	// ============================================================
+	// Sirkulir Kontrak dashboard — proses approval kontrak
+	// Source: patlog__contract.entity__contract_approval + entity__contract_log
+	// ============================================================
+
+	// Build a date-filter clause on entity__contract.contract_insert (creation).
+	// Returns [where_fragment, params_array]. Fragment starts with ' AND ...' so
+	// safe to append to an existing WHERE.
+	private function _sk_date_where(&$params)
+	{
+		$where = '';
+		$df = $this->input->get('date_from');
+		$dt = $this->input->get('date_to');
+		if ($df && preg_match('/^\d{4}-\d{2}-\d{2}$/', $df)) {
+			$where .= ' AND c.contract_insert >= ?';
+			$params[] = $df . ' 00:00:00';
+		}
+		if ($dt && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dt)) {
+			$where .= ' AND c.contract_insert <= ?';
+			$params[] = $dt . ' 23:59:59';
+		}
+		return $where;
+	}
+
+	public function api_sk_overview()
+	{
+		$params = array();
+		$dateWhere = $this->_sk_date_where($params);
+
+		// In progress = not deleted and not done
+		$rIP = $this->db->query("
+			SELECT COUNT(*) c FROM patlog__contract.entity__contract c
+			WHERE (c.contract_status_delete IS NULL OR c.contract_status_delete != 'yes')
+			  AND (c.contract_status_done IS NULL OR c.contract_status_done != 'yes')
+			  {$dateWhere}", $params)->row();
+
+		// Done
+		$rDone = $this->db->query("
+			SELECT COUNT(*) c FROM patlog__contract.entity__contract c
+			WHERE (c.contract_status_delete IS NULL OR c.contract_status_delete != 'yes')
+			  AND c.contract_status_done = 'yes' {$dateWhere}", $params)->row();
+
+		// Pending approval slots on in-progress contracts
+		$rPend = $this->db->query("
+			SELECT COUNT(*) c
+			FROM patlog__contract.entity__contract_approval a
+			JOIN patlog__contract.entity__contract c ON c.contract_id = a.contract_id
+			WHERE a.contract_approval_status IS NULL
+			  AND (c.contract_status_delete IS NULL OR c.contract_status_delete != 'yes')
+			  AND (c.contract_status_done   IS NULL OR c.contract_status_done   != 'yes')
+			  {$dateWhere}", $params)->row();
+
+		// Reject events (from log) on non-deleted contracts
+		$rRej = $this->db->query("
+			SELECT COUNT(*) c
+			FROM patlog__contract.entity__contract_log l
+			JOIN patlog__contract.entity__contract c ON c.contract_id = l.contract_id
+			WHERE l.contract_log_status = 'Rejected'
+			  AND (c.contract_status_delete IS NULL OR c.contract_status_delete != 'yes')
+			  {$dateWhere}", $params)->row();
+
+		// Back events (dikembalikan)
+		$rBack = $this->db->query("
+			SELECT COUNT(*) c
+			FROM patlog__contract.entity__contract_log l
+			JOIN patlog__contract.entity__contract c ON c.contract_id = l.contract_id
+			WHERE l.contract_log_status = 'Back'
+			  AND (c.contract_status_delete IS NULL OR c.contract_status_delete != 'yes')
+			  {$dateWhere}", $params)->row();
+
+		// Top approvers by activity
+		$rTop = $this->db->query("
+			SELECT l.contract_log_employee_name AS name,
+			       l.contract_log_employee_position_detail AS position,
+			       SUM(l.contract_log_status = 'Approved') AS approved,
+			       SUM(l.contract_log_status = 'Rejected') AS rejected
+			FROM patlog__contract.entity__contract_log l
+			JOIN patlog__contract.entity__contract c ON c.contract_id = l.contract_id
+			WHERE l.contract_log_status IN ('Approved','Rejected')
+			  AND l.contract_log_employee_name IS NOT NULL
+			  {$dateWhere}
+			GROUP BY l.contract_log_employee_name, l.contract_log_employee_position_detail
+			ORDER BY (SUM(l.contract_log_status='Approved') + SUM(l.contract_log_status='Rejected')) DESC
+			LIMIT 10", $params)->result();
+
+		// Recent activity — last 15 events across all in-progress contracts
+		$rRecent = $this->db->query("
+			SELECT c.contract_no,
+			       l.contract_log_employee_name AS actor,
+			       l.contract_log_status AS status,
+			       l.contract_log_message AS message,
+			       l.contract_log_insert  AS at
+			FROM patlog__contract.entity__contract_log l
+			JOIN patlog__contract.entity__contract c ON c.contract_id = l.contract_id
+			WHERE (c.contract_status_delete IS NULL OR c.contract_status_delete != 'yes')
+			  {$dateWhere}
+			ORDER BY l.contract_log_insert DESC, l.contract_log_id DESC
+			LIMIT 15", $params)->result();
+
+		$this->output->set_content_type('application/json');
+		$this->output->set_output(json_encode(array(
+			'ok'              => true,
+			'in_progress'     => (int)$rIP->c,
+			'done'            => (int)$rDone->c,
+			'pending_slots'   => (int)$rPend->c,
+			'rejected_events' => (int)$rRej->c,
+			'back_events'     => (int)$rBack->c,
+			'top_approver'    => $rTop,
+			'recent'          => $rRecent,
+		)));
+	}
+
+	public function api_sk_list()
+	{
+		$params = array();
+		$dateWhere = $this->_sk_date_where($params);
+		$limit = 2000;
+
+		$rows = $this->db->query("
+			SELECT c.contract_id, c.contract_no, c.contract_no_fix,
+			       c.contract_third_party_name              AS third_party,
+			       c.contract_creator_employee_in_name      AS drafter_name,
+			       c.contract_approval_current_name         AS next_approver,
+			       (SELECT l.contract_log_status
+			          FROM patlog__contract.entity__contract_log l
+			         WHERE l.contract_id = c.contract_id
+			         ORDER BY l.contract_log_id DESC LIMIT 1)          AS last_step,
+			       (SELECT l.contract_log_insert
+			          FROM patlog__contract.entity__contract_log l
+			         WHERE l.contract_id = c.contract_id
+			         ORDER BY l.contract_log_id DESC LIMIT 1)          AS last_activity
+			FROM patlog__contract.entity__contract c
+			WHERE (c.contract_status_delete IS NULL OR c.contract_status_delete != 'yes')
+			  AND (c.contract_status_done   IS NULL OR c.contract_status_done   != 'yes')
+			  {$dateWhere}
+			ORDER BY c.contract_insert DESC
+			LIMIT {$limit}
+		", $params)->result();
+
+		$this->output->set_content_type('application/json');
+		$this->output->set_output(json_encode(array('ok' => true, 'items' => $rows)));
+	}
+
+	public function api_sk_detail()
+	{
+		$id = (int)$this->input->get('contract_id');
+		if ($id <= 0) {
+			$this->output->set_content_type('application/json');
+			$this->output->set_output(json_encode(array('ok' => false, 'error' => 'contract_id wajib')));
+			return;
+		}
+		$c = $this->db->query("
+			SELECT c.contract_id, c.contract_no, c.contract_no_fix,
+			       c.contract_third_party_name             AS third_party,
+			       c.contract_creator_employee_in_name     AS drafter,
+			       c.contract_project_code_name            AS project_name,
+			       c.contract_date_start                   AS date_start,
+			       COALESCE(c.contract_active_end_date, c.contract_date_end) AS date_end
+			  FROM patlog__contract.entity__contract c
+			 WHERE c.contract_id = ? LIMIT 1", array($id))->row();
+		if (!$c) {
+			$this->output->set_content_type('application/json');
+			$this->output->set_output(json_encode(array('ok' => false, 'error' => 'contract tidak ditemukan')));
+			return;
+		}
+		$appr = $this->db->query("
+			SELECT contract_approval_id, contract_approval_level,
+			       contract_approval_employee_name, contract_approval_employee_position,
+			       contract_approval_category, contract_approval_status, contract_approval_date
+			  FROM patlog__contract.entity__contract_approval
+			 WHERE contract_id = ?
+			 ORDER BY contract_approval_level, contract_approval_id", array($id))->result();
+		$log = $this->db->query("
+			SELECT contract_log_id, contract_process_name, contract_log_status,
+			       contract_log_employee_name, contract_log_employee_position_detail,
+			       contract_log_message, contract_log_insert
+			  FROM patlog__contract.entity__contract_log
+			 WHERE contract_id = ?
+			 ORDER BY contract_log_id ASC", array($id))->result();
+
+		$this->output->set_content_type('application/json');
+		$this->output->set_output(json_encode(array(
+			'ok' => true, 'contract' => $c, 'approvals' => $appr, 'log' => $log,
+		)));
+	}
+
 }
 ?>

@@ -59,6 +59,13 @@ class Admin extends MX_Controller{
 		$this->load->view('admin/page/data_akses_monitoring_kontrak');
 		$this->load->view('admin/footer');
 	}
+
+	public function sirkulir_kontrak()
+	{
+		$this->load->view('admin/header');
+		$this->load->view('admin/page/sirkulir_kontrak');
+		$this->load->view('admin/footer');
+	}
 	
 	public function arsip_kontrak_utama()
 	{

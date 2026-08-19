@@ -53,8 +53,8 @@
 				<div class="ibox-title">
 					<h4>MONITORING KONTRAK</h4>
 					<div class="ibox-tools">
-						<a href="<?php echo site_url('module_request_employee/sirkulir/dashboard'); ?>" class="btn btn-primary btn-xs" style="color:#fff;">
-							<i class="fa fa-external-link"></i> Buka Dashboard Sirkulir
+						<a href="<?php echo site_url('module_contract/admin/sirkulir_kontrak'); ?>" class="btn btn-primary btn-xs" style="color:#fff;">
+							<i class="fa fa-external-link"></i> Buka Sirkulir Kontrak
 						</a>
 					</div>
 				</div>
@@ -70,7 +70,7 @@
 							</div>
 						</div>
 						<div class="mk-stat-cell">
-							<a href="<?php echo site_url('module_request_employee/sirkulir/dashboard'); ?>" style="text-decoration:none;">
+							<a href="<?php echo site_url('module_contract/admin/sirkulir_kontrak'); ?>" style="text-decoration:none;">
 								<div class="mk-stat st-ongoing">
 									<div><i class="fa fa-hourglass-half"></i> Total Request Ongoing</div>
 									<h1 id="stat-ongoing">-</h1>
