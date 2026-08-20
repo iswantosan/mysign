@@ -2251,7 +2251,7 @@
 													<tr>
 														<td><?php echo $no++; ?></td>
 														<td><?php echo $R1->employee_in_name; ?></td>
-														<td><?php echo $total_process; ?></td>
+														<td><?php if ($total_process > 0): ?><a href="javascript:void(0)" class="sppk-mapping-count" data-emp-id="<?php echo $R1->employee_in_id; ?>" data-emp-name="<?php echo htmlspecialchars($R1->employee_in_name, ENT_QUOTES); ?>" style="font-weight:600; color:#1c84c6; text-decoration:underline;"><?php echo $total_process; ?></a><?php else: ?><?php echo $total_process; ?><?php endif; ?></td>
 													</tr>
 													<?php
 														} 
@@ -3077,3 +3077,62 @@
 				<?php
 					}
 				?>
+<!-- BEGIN SPPK Drafter list popup (injected) -->
+<div class="modal fade" id="modal-sppk-drafter-list" tabindex="-1" role="dialog">
+	<div class="modal-dialog modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal">&times;</button>
+				<h4 class="modal-title">SPPK Diproses (Drafter) &mdash; <span id="sppk-modal-emp"></span></h4>
+			</div>
+			<div class="modal-body">
+				<div class="table-responsive">
+					<table class="table table-striped table-bordered" id="sppk-drafter-table">
+						<thead><tr>
+							<th style="width:50px;">No</th>
+							<th>Nomor SPPK</th>
+							<th>Nomor Fix</th>
+							<th>Mitra</th>
+							<th>Project</th>
+							<th>Drafter Awal</th>
+							<th>Last Activity</th>
+						</tr></thead>
+						<tbody></tbody>
+					</table>
+				</div>
+			</div>
+			<div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">Tutup</button></div>
+		</div>
+	</div>
+</div>
+<script>
+(function(){
+	var URL_SPPK = '<?php echo site_url("module_contract/employee_functions/sppk_drafter_list"); ?>';
+	function esc(s){ return (s==null?'':String(s)).replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+	$(document).on('click', '.sppk-mapping-count', function(){
+		var empId = $(this).data('emp-id'), empName = $(this).data('emp-name');
+		$('#sppk-modal-emp').text(empName);
+		$('#sppk-drafter-table tbody').html('<tr><td colspan="7" class="text-center"><i class="fa fa-spinner fa-spin"></i> Memuat...</td></tr>');
+		$('#modal-sppk-drafter-list').modal('show');
+		$.get(URL_SPPK, {employee_in_id: empId}, function(res){
+			if(!res || !res.ok){ $('#sppk-drafter-table tbody').html('<tr><td colspan="7" class="text-danger">Gagal memuat.</td></tr>'); return; }
+			if(!res.items || !res.items.length){ $('#sppk-drafter-table tbody').html('<tr><td colspan="7" class="text-center text-muted">Tidak ada SPPK.</td></tr>'); return; }
+			var html = '';
+			for(var i=0;i<res.items.length;i++){
+				var r = res.items[i];
+				html += '<tr>'
+					+ '<td>'+(i+1)+'</td>'
+					+ '<td>'+esc(r.contract_no)+'</td>'
+					+ '<td>'+esc(r.contract_no_fix||'-')+'</td>'
+					+ '<td>'+esc(r.contract_company_name||r.contract_third_party_name||'-')+'</td>'
+					+ '<td><small>'+esc(r.contract_project_code_name||'-')+'</small></td>'
+					+ '<td>'+esc(r.drafter_awal||'-')+'</td>'
+					+ '<td><small>'+esc(r.last_status||'-')+' oleh '+esc(r.last_actor||'-')+'<br/>'+esc(r.last_at||'-')+'</small></td>'
+					+ '</tr>';
+			}
+			$('#sppk-drafter-table tbody').html(html);
+		}, 'json');
+	});
+})();
+</script>
+<!-- END SPPK Drafter list popup -->
